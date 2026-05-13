@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthStatus, RequirePanelAccess } from "./auth-client";
 import { Car, formatCurrency, formatKm, getShop, shops } from "./data";
 
 export function GlobalNavigation({ mode = "public" }: { mode?: "public" | "shop" | "master" }) {
@@ -24,14 +25,7 @@ export function GlobalNavigation({ mode = "public" }: { mode?: "public" | "shop"
           <Link href="/repasse">Repasse B2B</Link>
           <Link href="/loja/primemotors">Loja exemplo</Link>
         </nav>
-        <div className="flex items-center gap-2">
-          <Link href="/login" className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-bold text-slate-800">
-            Entrar
-          </Link>
-          <Link href="/cadastro" className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">
-            Anunciar
-          </Link>
-        </div>
+        <AuthStatus />
       </div>
     </header>
   );
@@ -47,6 +41,7 @@ export function AdminShell({
   const master = mode === "master";
   return (
     <div className="min-h-screen bg-slate-100">
+      <RequirePanelAccess mode={mode} />
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-200 bg-slate-950 p-5 text-white lg:block">
         <Link href="/" className="mb-8 flex items-center gap-3">
           <span className={`grid h-10 w-10 place-items-center rounded-lg font-black ${master ? "bg-red-600" : "bg-blue-600"}`}>VA</span>

@@ -1,0 +1,326 @@
+"use client";
+
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { Car, formatCurrency, formatKm } from "./data";
+
+type StoredUser = {
+  id: string;
+  name: string;
+  username: string;
+  email: string;
+  whatsapp: string;
+  city: string;
+  role: "USER" | "SHOP" | "MASTER";
+  isActive: boolean;
+};
+
+const CARS_KEY = "vitrineauto.cars";
+const USERS_KEY = "vitrineauto.users";
+const SESSION_KEY = "vitrineauto.session";
+
+const fallbackImage =
+  "https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?auto=format&fit=crop&w=1200&q=80";
+
+function readJson<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  const stored = window.localStorage.getItem(key);
+  if (!stored) {
+    window.localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+  try {
+    return JSON.parse(stored) as T;
+  } catch {
+    window.localStorage.setItem(key, JSON.stringify(fallback));
+    return fallback;
+  }
+}
+
+function writeJson<T>(key: string, value: T) {
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function readCurrentUser() {
+  const users = readJson<StoredUser[]>(USERS_KEY, []);
+  const sessionId = window.localStorage.getItem(SESSION_KEY);
+  return users.find((user) => user.id === sessionId) ?? null;
+}
+
+function normalizeMoney(value: FormDataEntryValue | null) {
+  return Number(String(value ?? "0").replace(/\D/g, "")) || 0;
+}
+
+function normalizeNumber(value: FormDataEntryValue | null) {
+  return Number(String(value ?? "0").replace(/\D/g, "")) || 0;
+}
+
+export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
+  const [currentUser, setCurrentUser] = useState<StoredUser | null>(null);
+  const [cars, setCars] = useState<Car[]>([]);
+  const [editing, setEditing] = useState<Car | null>(null);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setCurrentUser(readCurrentUser());
+      setCars(readJson<Car[]>(CARS_KEY, seedCars));
+    });
+  }, [seedCars]);
+
+  const shopId = currentUser?.id === "shop-prime" ? "prime" : currentUser?.id;
+  const myCars = useMemo(
+    () => cars.filter((car) => car.shopId === shopId || (!currentUser && car.shopId === "prime")),
+    [cars, currentUser, shopId],
+  );
+  const stockValue = myCars.reduce((total, car) => total + car.price, 0);
+  const views = myCars.reduce((total, car) => total + car.views, 0);
+  const leads = myCars.reduce((total, car) => total + car.leads, 0);
+
+  function persist(nextCars: Car[]) {
+    setCars(nextCars);
+    writeJson(CARS_KEY, nextCars);
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const isRepasse = form.get("isRepasse") === "on";
+    const ownerId = shopId ?? "prime";
+    const optional = String(form.get("optional") ?? "")
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const image = String(form.get("image") ?? "").trim() || fallbackImage;
+
+    const car: Car = {
+      id: editing?.id ?? `car-${Date.now()}`,
+      shopId: ownerId,
+      name: String(form.get("name") ?? "").trim(),
+      brand: String(form.get("brand") ?? "").trim(),
+      plate: String(form.get("plate") ?? "").trim().toUpperCase(),
+      color: String(form.get("color") ?? "").trim(),
+      year: normalizeNumber(form.get("year")),
+      km: normalizeNumber(form.get("km")),
+      price: normalizeMoney(form.get("price")),
+      fipe: normalizeMoney(form.get("fipe")),
+      commission: isRepasse ? normalizeMoney(form.get("commission")) : undefined,
+      description: String(form.get("description") ?? "").trim(),
+      repasseNote: String(form.get("repasseNote") ?? "").trim(),
+      isRepasse,
+      views: editing?.views ?? 0,
+      leads: editing?.leads ?? 0,
+      optional,
+      images: [image],
+    };
+
+    const nextCars = editing
+      ? cars.map((item) => (item.id === editing.id ? car : item))
+      : [car, ...cars];
+
+    persist(nextCars);
+    setEditing(null);
+    setMessage(editing ? "Anuncio atualizado com sucesso." : "Anuncio criado com sucesso.");
+    event.currentTarget.reset();
+  }
+
+  function remove(carId: string) {
+    persist(cars.filter((car) => car.id !== carId));
+    setMessage("Anuncio excluido.");
+  }
+
+  return (
+    <>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[0.24em] text-blue-600">Painel pessoal</p>
+          <h1 className="mt-2 text-3xl font-black text-slate-950">Dashboard do lojista</h1>
+          <p className="mt-1 font-semibold text-slate-500">{currentUser?.name ?? "Prime Motors"}</p>
+        </div>
+        <button onClick={() => setEditing(null)} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-black text-white">
+          Novo anuncio
+        </button>
+      </div>
+
+      <div className="mt-6 grid gap-4 md:grid-cols-4">
+        <PanelStat label="Carros ativos" value={`${myCars.length}`} />
+        <PanelStat label="Valor em estoque" value={formatCurrency(stockValue)} />
+        <PanelStat label="Visualizacoes" value={`${views}`} />
+        <PanelStat label="Interesses" value={`${leads}`} />
+      </div>
+
+      <section className="mt-8 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="text-xl font-black text-slate-950">{editing ? "Editar anuncio" : "Criar anuncio"}</h2>
+        {message && <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm font-bold text-green-700">{message}</p>}
+        <form key={editing?.id ?? "new"} onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-3">
+          <input name="plate" className="field" placeholder="Placa" defaultValue={editing?.plate} required />
+          <input name="brand" className="field" placeholder="Marca" defaultValue={editing?.brand} required />
+          <input name="name" className="field" placeholder="Nome do veiculo" defaultValue={editing?.name} required />
+          <input name="color" className="field" placeholder="Cor" defaultValue={editing?.color} required />
+          <input name="year" className="field" placeholder="Ano" defaultValue={editing?.year} required />
+          <input name="km" className="field" placeholder="KM" defaultValue={editing?.km} required />
+          <input name="price" className="field" placeholder="Preco a vista" defaultValue={editing?.price} required />
+          <input name="fipe" className="field" placeholder="Preco FIPE" defaultValue={editing?.fipe} required />
+          <input name="commission" className="field" placeholder="Comissao se for repasse" defaultValue={editing?.commission} />
+          <input name="image" className="field md:col-span-2" placeholder="URL da foto" defaultValue={editing?.images[0]} />
+          <label className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 px-3 text-sm font-black text-slate-700">
+            <input name="isRepasse" type="checkbox" defaultChecked={editing?.isRepasse} /> E repasse?
+          </label>
+          <input name="optional" className="field md:col-span-3" placeholder="Opcionais separados por virgula" defaultValue={editing?.optional.join(", ")} />
+          <textarea name="description" className="field textarea md:col-span-3" placeholder="Descricao" defaultValue={editing?.description} />
+          <textarea name="repasseNote" className="field textarea md:col-span-3" placeholder="Observacoes especificas do repasse" defaultValue={editing?.repasseNote} />
+          <button className="rounded-lg bg-slate-950 px-5 py-3 text-sm font-black text-white">
+            {editing ? "Salvar alteracoes" : "Salvar anuncio"}
+          </button>
+        </form>
+      </section>
+
+      <section className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-200 p-5">
+          <h2 className="text-xl font-black text-slate-950">Meus anuncios</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-left text-sm">
+            <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-5 py-3">Veiculo</th>
+                <th className="px-5 py-3">Tipo</th>
+                <th className="px-5 py-3">Preco</th>
+                <th className="px-5 py-3">KM</th>
+                <th className="px-5 py-3">Acoes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {myCars.map((car) => (
+                <tr key={car.id}>
+                  <td className="px-5 py-4 font-black text-slate-950">{car.name}</td>
+                  <td className="px-5 py-4">{car.isRepasse ? "Repasse" : "Varejo"}</td>
+                  <td className="px-5 py-4">{formatCurrency(car.price)}</td>
+                  <td className="px-5 py-4">{formatKm(car.km)}</td>
+                  <td className="px-5 py-4">
+                    <button onClick={() => setEditing(car)} className="mr-2 rounded-md border border-slate-200 px-3 py-2 font-bold">Editar</button>
+                    <button onClick={() => remove(car.id)} className="rounded-md bg-red-50 px-3 py-2 font-bold text-red-700">Excluir</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
+  );
+}
+
+function PanelStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white p-5">
+      <p className="text-sm font-bold text-slate-500">{label}</p>
+      <p className="mt-2 text-3xl font-black text-slate-950">{value}</p>
+    </div>
+  );
+}
+
+export function MasterUsersClient({ seedUsers, seedCars }: { seedUsers: StoredUser[]; seedCars: Car[] }) {
+  const [users, setUsers] = useState<StoredUser[]>([]);
+  const [cars, setCars] = useState<Car[]>([]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setUsers(readJson<StoredUser[]>(USERS_KEY, seedUsers));
+      setCars(readJson<Car[]>(CARS_KEY, seedCars));
+    });
+  }, [seedCars, seedUsers]);
+
+  function toggle(userId: string) {
+    const nextUsers = users.map((user) =>
+      user.id === userId && user.role !== "MASTER" ? { ...user, isActive: !user.isActive } : user,
+    );
+    setUsers(nextUsers);
+    writeJson(USERS_KEY, nextUsers);
+  }
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-5 py-3">Nome</th>
+              <th className="px-5 py-3">E-mail</th>
+              <th className="px-5 py-3">Telefone</th>
+              <th className="px-5 py-3">Role</th>
+              <th className="px-5 py-3">Carros</th>
+              <th className="px-5 py-3">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="px-5 py-4 font-black text-slate-950">{user.name}</td>
+                <td className="px-5 py-4">{user.email}</td>
+                <td className="px-5 py-4">{user.whatsapp}</td>
+                <td className="px-5 py-4">{user.role}</td>
+                <td className="px-5 py-4">{cars.filter((car) => car.shopId === user.id || (user.id === "shop-prime" && car.shopId === "prime")).length}</td>
+                <td className="px-5 py-4">
+                  <button onClick={() => toggle(user.id)} className={`rounded-md px-3 py-2 font-black ${user.isActive ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                    {user.isActive ? "Ativo" : "Bloqueado"}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+export function MasterCarsClient({ seedCars }: { seedCars: Car[] }) {
+  const [cars, setCars] = useState<Car[]>([]);
+
+  useEffect(() => {
+    queueMicrotask(() => {
+      setCars(readJson<Car[]>(CARS_KEY, seedCars));
+    });
+  }, [seedCars]);
+
+  function remove(carId: string) {
+    const nextCars = cars.filter((car) => car.id !== carId);
+    setCars(nextCars);
+    writeJson(CARS_KEY, nextCars);
+  }
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs font-black uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-5 py-3">Carro</th>
+              <th className="px-5 py-3">Loja</th>
+              <th className="px-5 py-3">Tipo</th>
+              <th className="px-5 py-3">Preco</th>
+              <th className="px-5 py-3">Ano</th>
+              <th className="px-5 py-3">KM</th>
+              <th className="px-5 py-3">Acoes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {cars.map((car) => (
+              <tr key={car.id}>
+                <td className="px-5 py-4 font-black text-slate-950">{car.name}</td>
+                <td className="px-5 py-4">{car.shopId}</td>
+                <td className="px-5 py-4">{car.isRepasse ? "Repasse" : "Varejo"}</td>
+                <td className="px-5 py-4">{formatCurrency(car.price)}</td>
+                <td className="px-5 py-4">{car.year}</td>
+                <td className="px-5 py-4">{formatKm(car.km)}</td>
+                <td className="px-5 py-4">
+                  <button onClick={() => remove(car.id)} className="rounded-md bg-red-50 px-3 py-2 font-bold text-red-700">Excluir</button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
