@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { Car, formatCurrency, formatKm } from "./data";
+import { Car, formatCurrency, formatKm, optionals } from "./data";
 
 type StoredUser = {
   id: string;
@@ -82,6 +82,7 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
   const [editing, setEditing] = useState<Car | null>(null);
   const [message, setMessage] = useState("");
   const [repasseEnabled, setRepasseEnabled] = useState(false);
+  const [selectedOptionals, setSelectedOptionals] = useState<string[]>([]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -102,8 +103,15 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
   useEffect(() => {
     queueMicrotask(() => {
       setRepasseEnabled(Boolean(editing?.isRepasse));
+      setSelectedOptionals(editing?.optional ?? []);
     });
   }, [editing]);
+
+  function toggleOptional(item: string) {
+    setSelectedOptionals((current) =>
+      current.includes(item) ? current.filter((value) => value !== item) : [...current, item],
+    );
+  }
 
   function persist(nextCars: Car[]) {
     setCars(nextCars);
@@ -115,10 +123,6 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
     const form = new FormData(event.currentTarget);
     const isRepasse = form.get("isRepasse") === "on";
     const ownerId = shopId ?? "prime";
-    const optional = String(form.get("optional") ?? "")
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
     const image = String(form.get("image") ?? "").trim() || fallbackImage;
 
     const car: Car = {
@@ -138,8 +142,12 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
       isRepasse,
       views: editing?.views ?? 0,
       leads: editing?.leads ?? 0,
-      optional,
+      optional: selectedOptionals,
       images: [image],
+      shopName: currentUser?.name,
+      shopUsername: currentUser?.username,
+      shopWhatsapp: currentUser?.whatsapp,
+      shopCity: currentUser?.city,
     };
 
     const nextCars = editing
@@ -148,6 +156,8 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
 
     persist(nextCars);
     setEditing(null);
+    setSelectedOptionals([]);
+    setRepasseEnabled(false);
     setMessage(editing ? "Anuncio atualizado com sucesso." : "Anuncio criado com sucesso.");
     event.currentTarget.reset();
   }
@@ -165,7 +175,7 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
           <h1 className="mt-2 text-3xl font-black text-slate-950">Dashboard do lojista</h1>
           <p className="mt-1 font-semibold text-slate-500">{currentUser?.name ?? "Prime Motors"}</p>
         </div>
-        <button onClick={() => { setEditing(null); setRepasseEnabled(false); }} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-black text-white">
+        <button onClick={() => { setEditing(null); setRepasseEnabled(false); setSelectedOptionals([]); }} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-black text-white">
           Novo anuncio
         </button>
       </div>
@@ -193,7 +203,20 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
           <label className={`flex min-h-12 items-center gap-3 rounded-lg border px-3 text-sm font-black ${repasseEnabled ? "border-amber-300 bg-amber-50 text-amber-900" : "border-slate-200 text-slate-700"}`}>
             <input name="isRepasse" type="checkbox" checked={repasseEnabled} onChange={(event) => setRepasseEnabled(event.target.checked)} /> E repasse?
           </label>
-          <input name="optional" className="field md:col-span-3" placeholder="Opcionais separados por virgula" defaultValue={editing?.optional.join(", ")} />
+          <details className="rounded-lg border border-slate-200 bg-slate-50 p-3 md:col-span-3" open>
+            <summary className="cursor-pointer text-sm font-black text-slate-800">Opcionais do veiculo</summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {optionals.map((item) => (
+                <label
+                  key={item}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-black ${selectedOptionals.includes(item) ? "border-blue-600 bg-blue-600 text-white" : "border-slate-200 bg-white text-slate-700"}`}
+                >
+                  <input type="checkbox" checked={selectedOptionals.includes(item)} onChange={() => toggleOptional(item)} />
+                  {item}
+                </label>
+              ))}
+            </div>
+          </details>
           <textarea name="description" className="field textarea md:col-span-3" placeholder="Descricao" defaultValue={editing?.description} />
           {repasseEnabled && (
             <div className="grid gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 md:col-span-3 md:grid-cols-2">

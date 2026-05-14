@@ -32,6 +32,10 @@ export type Car = {
   leads: number;
   optional: string[];
   images: string[];
+  shopName?: string;
+  shopUsername?: string;
+  shopWhatsapp?: string;
+  shopCity?: string;
 };
 
 export const shops: Shop[] = [

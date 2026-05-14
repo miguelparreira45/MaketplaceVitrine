@@ -81,6 +81,10 @@ export function AdminShell({
 
 export function CarCard({ car, b2b = false }: { car: Car; b2b?: boolean }) {
   const shop = getShop(car.shopId);
+  const shopName = shop?.name ?? car.shopName ?? "Loja anunciante";
+  const shopCity = shop?.city ?? car.shopCity ?? "Cidade nao informada";
+  const shopUsername = shop?.username ?? car.shopUsername;
+  const shopWhatsapp = shop?.whatsapp ?? car.shopWhatsapp;
   const message = encodeURIComponent(`Ola, vi o ${car.name} na VitrineAuto e tenho interesse.`);
 
   return (
@@ -95,7 +99,7 @@ export function CarCard({ car, b2b = false }: { car: Car; b2b?: boolean }) {
             <h3 className="text-lg font-black text-slate-950">{car.name}</h3>
             <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{car.year}</span>
           </div>
-          <p className="mt-1 text-sm font-semibold text-slate-500">{shop?.name} - {shop?.city}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">{shopName} - {shopCity}</p>
         </div>
         {b2b ? (
           <div className="grid grid-cols-2 gap-2">
@@ -111,10 +115,10 @@ export function CarCard({ car, b2b = false }: { car: Car; b2b?: boolean }) {
           <span className="rounded-md bg-slate-50 p-2">{car.brand}</span>
         </div>
         <div className="flex gap-2">
-          <Link href={b2b ? `/repasse#${car.id}` : `/loja/${shop?.username}`} className="flex-1 rounded-lg border border-slate-200 px-3 py-3 text-center text-sm font-black text-slate-800">
+          <Link href={b2b ? `/repasse#${car.id}` : `/loja/${shopUsername ?? ""}`} className="flex-1 rounded-lg border border-slate-200 px-3 py-3 text-center text-sm font-black text-slate-800">
             Ver detalhes
           </Link>
-          <a href={`https://wa.me/${shop?.whatsapp}?text=${message}`} className="flex-1 rounded-lg bg-green-600 px-3 py-3 text-center text-sm font-black text-white">
+          <a href={`https://wa.me/${shopWhatsapp ?? ""}?text=${message}`} className="flex-1 rounded-lg bg-green-600 px-3 py-3 text-center text-sm font-black text-white">
             WhatsApp
           </a>
         </div>

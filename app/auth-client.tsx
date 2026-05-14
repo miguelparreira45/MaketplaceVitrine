@@ -124,7 +124,6 @@ export function UserNavigationLinks() {
       <Link href="/">Vitrine</Link>
       <Link href="/repasse">Repasse B2B</Link>
       {user?.role === "SHOP" && <Link href={storePathFor(user)}>Minha loja</Link>}
-      {!user && <Link href="/loja/primemotors">Loja exemplo</Link>}
     </>
   );
 }
