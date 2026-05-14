@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         tipo: "fipe-chassi",
         placa: cleanPlate,
-        homolog: false,
+        homolog: true,
       }),
       signal: controller.signal,
       redirect: "follow",
