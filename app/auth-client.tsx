@@ -6,7 +6,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 type Role = "USER" | "SHOP" | "MASTER";
 
-type StoredUser = {
+export type StoredUser = {
   id: string;
   name: string;
   username: string;
@@ -23,7 +23,7 @@ type StoredUser = {
 const USERS_KEY = "vitrineauto.users";
 const SESSION_KEY = "vitrineauto.session";
 
-const seedUsers: StoredUser[] = [
+export const seedUsers: StoredUser[] = [
   {
     id: "master-admin",
     name: "Administrador",
@@ -51,7 +51,7 @@ const seedUsers: StoredUser[] = [
   },
 ];
 
-function readUsers() {
+export function readUsers() {
   if (typeof window === "undefined") return seedUsers;
   const stored = window.localStorage.getItem(USERS_KEY);
   if (!stored) {
@@ -78,7 +78,7 @@ function saveUsers(users: StoredUser[]) {
   window.localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
-function readSession() {
+export function readSession() {
   if (typeof window === "undefined") return null;
   const sessionId = window.localStorage.getItem(SESSION_KEY);
   if (!sessionId) return null;
@@ -99,6 +99,57 @@ function dashboardFor(role: Role) {
   if (role === "MASTER") return "/master";
   if (role === "SHOP") return "/admin";
   return "/";
+}
+
+function storePathFor(user: StoredUser | null) {
+  return user?.role === "SHOP" ? `/loja/${user.username}` : "/";
+}
+
+export function UserNavigationLinks() {
+  const [user, setUser] = useState<StoredUser | null>(null);
+
+  useEffect(() => {
+    const sync = () => setUser(readSession());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("vitrineauto-auth", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("vitrineauto-auth", sync);
+    };
+  }, []);
+
+  return (
+    <>
+      <Link href="/">Vitrine</Link>
+      <Link href="/repasse">Repasse B2B</Link>
+      {user?.role === "SHOP" && <Link href={storePathFor(user)}>Minha loja</Link>}
+      {!user && <Link href="/loja/primemotors">Loja exemplo</Link>}
+    </>
+  );
+}
+
+export function ShopSidebarLinks() {
+  const [user, setUser] = useState<StoredUser | null>(null);
+
+  useEffect(() => {
+    const sync = () => setUser(readSession());
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("vitrineauto-auth", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("vitrineauto-auth", sync);
+    };
+  }, []);
+
+  return (
+    <>
+      <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/repasse">Area B2B</Link>
+      <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/admin/store">Minha loja</Link>
+      <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href={storePathFor(user)}>Ver vitrine</Link>
+    </>
+  );
 }
 
 export function AuthStatus() {

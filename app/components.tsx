@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AuthStatus, RequirePanelAccess } from "./auth-client";
+import { AuthStatus, RequirePanelAccess, ShopSidebarLinks, UserNavigationLinks } from "./auth-client";
 import { Car, formatCurrency, formatKm, getShop, shops } from "./data";
 
 export function GlobalNavigation({ mode = "public" }: { mode?: "public" | "shop" | "master" }) {
@@ -21,9 +21,7 @@ export function GlobalNavigation({ mode = "public" }: { mode?: "public" | "shop"
           </span>
         </Link>
         <nav className="hidden items-center gap-6 text-sm font-semibold text-slate-600 md:flex">
-          <Link href="/">Vitrine</Link>
-          <Link href="/repasse">Repasse B2B</Link>
-          <Link href="/loja/primemotors">Loja exemplo</Link>
+          <UserNavigationLinks />
         </nav>
         <AuthStatus />
       </div>
@@ -66,11 +64,7 @@ export function AdminShell({
               <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/master/cars">Estoque geral</Link>
             </>
           ) : (
-            <>
-              <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/repasse">Area B2B</Link>
-              <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/admin/store">Minha loja</Link>
-              <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/loja/primemotors">Ver vitrine</Link>
-            </>
+            <ShopSidebarLinks />
           )}
           <Link className="rounded-lg px-3 py-3 hover:bg-white/10" href="/">Sair</Link>
         </nav>
