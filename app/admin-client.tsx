@@ -81,6 +81,8 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
   const [cars, setCars] = useState<Car[]>([]);
   const [editing, setEditing] = useState<Car | null>(null);
   const [message, setMessage] = useState("");
+  const [plateMessage, setPlateMessage] = useState("");
+  const [consultingPlate, setConsultingPlate] = useState(false);
   const [repasseEnabled, setRepasseEnabled] = useState(false);
   const [selectedOptionals, setSelectedOptionals] = useState<string[]>([]);
 
@@ -167,6 +169,60 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
     setMessage("Anuncio excluido.");
   }
 
+  async function consultPlate() {
+    const plateInput = document.querySelector<HTMLInputElement>("[name='plate']");
+    const form = plateInput?.form;
+    const placa = plateInput?.value.trim();
+
+    if (!placa) {
+      setPlateMessage("Informe a placa antes de consultar.");
+      return;
+    }
+
+    setConsultingPlate(true);
+    setPlateMessage("Consultando placa na API Brasil...");
+
+    try {
+      const response = await fetch("/api/placa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ placa }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        setPlateMessage(data.message ?? "Nao foi possivel consultar esta placa.");
+        return;
+      }
+
+      const vehicle = data.vehicle as {
+        brand?: string;
+        name?: string;
+        color?: string;
+        year?: number;
+        fipe?: number;
+      };
+
+      const setValue = (name: string, value?: string | number) => {
+        const input = form?.querySelector<HTMLInputElement>(`[name='${name}']`);
+        if (input && value !== undefined && value !== "") {
+          input.value = String(value);
+        }
+      };
+
+      setValue("brand", vehicle.brand);
+      setValue("name", vehicle.name);
+      setValue("color", vehicle.color);
+      setValue("year", vehicle.year);
+      setValue("fipe", vehicle.fipe ? formatCurrency(vehicle.fipe) : "");
+      setPlateMessage("Dados encontrados e preenchidos automaticamente.");
+    } catch {
+      setPlateMessage("Erro ao consultar a placa.");
+    } finally {
+      setConsultingPlate(false);
+    }
+  }
+
   return (
     <>
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -191,7 +247,13 @@ export function AdminInventoryClient({ seedCars }: { seedCars: Car[] }) {
         <h2 className="text-xl font-black text-slate-950">{editing ? "Editar anuncio" : "Criar anuncio"}</h2>
         {message && <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm font-bold text-green-700">{message}</p>}
         <form key={editing?.id ?? "new"} onSubmit={submit} className="mt-4 grid gap-3 md:grid-cols-3">
-          <input name="plate" className="field" placeholder="Placa" defaultValue={editing?.plate} required />
+          <div className="grid gap-2 md:col-span-3 lg:grid-cols-[1fr_auto]">
+            <input name="plate" className="field" placeholder="Placa" defaultValue={editing?.plate} required />
+            <button type="button" onClick={consultPlate} disabled={consultingPlate} className="rounded-lg bg-blue-600 px-5 py-3 text-sm font-black text-white disabled:opacity-60">
+              {consultingPlate ? "Consultando..." : "Consultar placa"}
+            </button>
+          </div>
+          {plateMessage && <p className="rounded-lg bg-blue-50 p-3 text-sm font-bold text-blue-700 md:col-span-3">{plateMessage}</p>}
           <input name="brand" className="field" placeholder="Marca" defaultValue={editing?.brand} required />
           <input name="name" className="field" placeholder="Nome do veiculo" defaultValue={editing?.name} required />
           <input name="color" className="field" placeholder="Cor" defaultValue={editing?.color} required />
